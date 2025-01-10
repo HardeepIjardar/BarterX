@@ -1,97 +1,65 @@
+
+
 import { createServer } from 'http';
-import { appendFile, readFile } from 'fs/promises';
-import { join } from 'path';
+import { readFile } from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-// Define the port
 const PORT = 8090;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const contentsDir = join(__dirname, 'contents');
 
-// Log requests to a file
-const logRequest = async (url) => {
+const logFilePath = join(__dirname, "log.txt");
+const logStream = createWriteStream(logFilePath, { flags: 'a' });
+
+const logRequest = (url) => {
     const logEntry = `${new Date().toISOString()} - Request URL: ${url}\n`;
-    const logFilePath = join(import.meta.dir, "log.txt");
-    try {
-        await appendFile(logFilePath, logEntry);
-    } catch (err) {
-        console.error(`Error writing to log file: ${err}`);
-    }
+    logStream.write(logEntry, (err) => {
+        if (err) {
+            console.error(`Error writing to log file: ${err}`);
+        }
+    });
 };
 
-// Helper function to serve HTML files
-const serveHtml = async (res, filePath) => {
+const serveHtmlFile = async (res, filePath) => {
     try {
-        const fullPath = join(import.meta.dir, "html", filePath);
-        const content = await readFile(fullPath, "utf-8");
-        res.setHeader("Content-Type", "text/html");
-        res.statusCode = 200;
-        res.end(content);
-    } catch (err) {
-        console.error(`Error serving file ${filePath}: ${err}`);
+        const data = await readFile(filePath, 'utf-8');
+        res.setHeader('Content-Type', 'text/html');
+        res.end(data);
+    } catch (error) {
         res.statusCode = 500;
-        res.end("Internal Server Error");
+        res.end("<h1>Internal Server Error</h1>");
     }
 };
 
-// Create the server
 const server = createServer(async (req, res) => {
     const url = req.url;
+    logRequest(url);
+    const routes = {
+        "/": "index.html",
+        "/products": "products.html",
+        "/login": "login.html",
+        "/signup": "signup.html",
+        "/profile": "profile.html",
+        "/cart": "cart.html",
+        "/checkout": "checkout.html",
+        "/orders": "orders.html",
+        "/categories": "categories.html",
+        "/chat": "chat.html",
+        "/contact": "contact.html",
+        "/about": "about.html",
+    };
 
-    // Log the request
-    await logRequest(url);
-
-    switch (url) {
-        case "/":
-            await serveHtml(res, "./contents/index.html");
-            break;
-        case "/products":
-            await serveHtml(res, "./contents/products.html");
-            break;
-        case "/login":
-            await serveHtml(res, "./contents/login.html");
-            break;
-        case "/signup":
-            await serveHtml(res, "./contents/signup.html");
-            break;
-        case "/profile":
-            await serveHtml(res, "./contents/profile.html");
-            break;
-        case "/cart":
-            await serveHtml(res, "./contents/cart.html");
-            break;
-        case "/checkout":
-            await serveHtml(res, "./contents/checkout.html");
-            break;
-        case "/orders":
-            await serveHtml(res, "./contents/orders.html");
-            break;
-        case "/categories":
-            await serveHtml(res, "./contents/categories.html");
-            break;
-        case "/chat":
-            await serveHtml(res, "./contents/chat.html");
-            break;
-        case "/contact":
-            await serveHtml(res, "./contents/contact.html");
-            break;
-        case "/about":
-            const filePath = path.join(__dirname, "contents", "about.html");
-            fs.readFile(filePath, "utf8", (err, data) => {
-              if (err) {
-                res.writeHead(500, { "Content-Type": "text/plain" });
-                res.end("Internal Server Error");
-              } else {
-                res.writeHead(200, { "Content-Type": "text/html" });
-                res.end(data);
-              }
-            });
-            break;
-        default:
-            res.statusCode = 404;
-            await serveHtml(res, "./contents/notfound.html");
-            break;
+    const fileName = routes[url];
+    if (fileName) {
+        const filePath = join(contentsDir, fileName); // Construct path to the file
+        await serveHtmlFile(res, filePath);
+    } else {
+        res.statusCode = 404;
+        res.end("<h1>Page not found</h1>");
     }
 });
-
-// Start the server
 server.listen(PORT, () => {
-    console.log(`Server initiated on port ${PORT}...`);
+    console.log(`Server running on http://localhost:${PORT}/`);
 });
